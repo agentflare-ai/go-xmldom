@@ -1,0 +1,217 @@
+package agentflare:xmldom@0.1.0;
+
+/// XML DOM types and interfaces exposed as a host component
+/// This file intentionally mirrors the stable surface of go-xmldom needed by AgentML and plugins.
+
+/// DOM node kinds (subset of W3C NodeType)
+enum node-type {
+    element,
+    attribute,
+    text,
+    cdata-section,
+    entity-reference,
+    entity,
+    processing-instruction,
+    comment,
+    document,
+    document-type,
+    document-fragment,
+    notation,
+}
+
+/// Source position (file may not be available at runtime)
+record position {
+    line: u32,
+    column: u32,
+    offset: u64,
+}
+
+/// Document position bitmask constants for compare-document-position
+interface constants {
+    const DOCUMENT-POSITION-DISCONNECTED: u16 = 0x01;
+    const DOCUMENT-POSITION-PRECEDING: u16 = 0x02;
+    const DOCUMENT-POSITION-FOLLOWING: u16 = 0x04;
+    const DOCUMENT-POSITION-CONTAINS: u16 = 0x08;
+    const DOCUMENT-POSITION-CONTAINED-BY: u16 = 0x10;
+    const DOCUMENT-POSITION-IMPLEMENTATION-SPECIFIC: u16 = 0x20;
+}
+
+/// XML DOM host interface
+interface xmldom {
+    /// NamedNodeMap resource (collection of nodes accessible by name)
+    resource named-node-map {
+        get-named-item: func(name: string) -> option<node>;
+        set-named-item: func(n: node) -> result<option<node>, string>;
+        remove-named-item: func(name: string) -> result<node, string>;
+        item: func(index: u32) -> option<node>;
+        length: func() -> u32;
+        get-named-item-ns: func(namespace-uri: string, local-name: string) -> option<node>;
+        set-named-item-ns: func(n: node) -> result<option<node>, string>;
+        remove-named-item-ns: func(namespace-uri: string, local-name: string) -> result<node, string>;
+    }
+
+    /// Base Node resource
+    resource node {
+        node-type: func() -> node-type;
+        node-name: func() -> string;
+        node-value: func() -> string;
+        set-node-value: func(value: string) -> result<_, string>;
+
+        parent-node: func() -> option<node>;
+        first-child: func() -> option<node>;
+        last-child: func() -> option<node>;
+        previous-sibling: func() -> option<node>;
+        next-sibling: func() -> option<node>;
+        attributes: func() -> option<named-node-map>;
+        owner-document: func() -> document;
+
+        insert-before: func(new-child: node, ref-child: option<node>) -> result<node, string>;
+        replace-child: func(new-child: node, old-child: node) -> result<node, string>;
+        remove-child: func(old-child: node) -> result<node, string>;
+        append-child: func(new-child: node) -> result<node, string>;
+
+        has-child-nodes: func() -> bool;
+        normalize: func();
+
+        namespace-uri: func() -> string;
+        prefix: func() -> string;
+        set-prefix: func(prefix: string) -> result<_, string>;
+        local-name: func() -> string;
+        has-attributes: func() -> bool;
+
+        text-content: func() -> string;
+        set-text-content: func(value: string);
+
+        position: func() -> position;
+
+        compare-document-position: func(other: node) -> u16;
+        contains: func(other: node) -> bool;
+        get-root-node: func() -> node;
+    }
+
+    /// Element node
+    resource element {
+        as-node: func() -> node;
+        tag-name: func() -> string;
+
+        get-attribute: func(name: string) -> string;
+        set-attribute: func(name: string, value: string) -> result<_, string>;
+        remove-attribute: func(name: string) -> result<_, string>;
+        get-attribute-ns: func(namespace-uri: string, local-name: string) -> string;
+        set-attribute-ns: func(namespace-uri: string, qualified-name: string, value: string) -> result<_, string>;
+        remove-attribute-ns: func(namespace-uri: string, local-name: string) -> result<_, string>;
+        has-attribute: func(name: string) -> bool;
+        has-attribute-ns: func(namespace-uri: string, local-name: string) -> bool;
+
+        get-elements-by-tag-name: func(name: string) -> list<element>;
+        get-elements-by-tag-name-ns: func(namespace-uri: string, local-name: string) -> list<element>;
+
+        toggle-attribute: func(name: string, force: option<bool>) -> bool;
+
+        /// Child element helpers
+        children: func() -> list<element>;
+        first-element-child: func() -> option<element>;
+        last-element-child: func() -> option<element>;
+        previous-element-sibling: func() -> option<element>;
+        next-element-sibling: func() -> option<element>;
+        child-element-count: func() -> u32;
+    }
+
+    /// Attribute node
+    resource attr {
+        as-node: func() -> node;
+        name: func() -> string;
+        value: func() -> string;
+        set-value: func(value: string);
+        owner-element: func() -> option<element>;
+    }
+
+    /// CharacterData base (Text/Comment/CDATASection)
+    resource character-data {
+        as-node: func() -> node;
+        data: func() -> string;
+        set-data: func(data: string) -> result<_, string>;
+        length: func() -> u32;
+        substring-data: func(offset: u32, count: u32) -> result<string, string>;
+        append-data: func(arg: string) -> result<_, string>;
+        insert-data: func(offset: u32, arg: string) -> result<_, string>;
+        delete-data: func(offset: u32, count: u32) -> result<_, string>;
+        replace-data: func(offset: u32, count: u32, arg: string) -> result<_, string>;
+    }
+
+    /// Text node
+    resource text {
+        as-character-data: func() -> character-data;
+        split-text: func(offset: u32) -> result<text, string>;
+    }
+
+    /// Comment node
+    resource comment {
+        as-character-data: func() -> character-data;
+    }
+
+    /// CDATA Section node
+    resource cdata-section {
+        as-text: func() -> text;
+    }
+
+    /// DocumentType node
+    resource document-type {
+        as-node: func() -> node;
+        name: func() -> string;
+        entities: func() -> named-node-map;
+        notations: func() -> named-node-map;
+        public-id: func() -> string;
+        system-id: func() -> string;
+        internal-subset: func() -> string;
+    }
+
+    /// ProcessingInstruction node
+    resource processing-instruction {
+        as-node: func() -> node;
+        target: func() -> string;
+        data: func() -> string;
+        set-data: func(data: string) -> result<_, string>;
+    }
+
+    /// DocumentFragment node
+    resource document-fragment {
+        as-node: func() -> node;
+    }
+
+    /// Document node
+    resource document {
+        as-node: func() -> node;
+        doctype: func() -> option<document-type>;
+        document-element: func() -> option<element>;
+
+        create-element: func(tag-name: string) -> result<element, string>;
+        create-document-fragment: func() -> document-fragment;
+        create-text-node: func(data: string) -> text;
+        create-comment: func(data: string) -> comment;
+        create-cdata-section: func(data: string) -> result<cdata-section, string>;
+        create-processing-instruction: func(target: string, data: string) -> result<processing-instruction, string>;
+        create-attribute: func(name: string) -> result<attr, string>;
+        create-element-ns: func(namespace-uri: string, qualified-name: string) -> result<element, string>;
+        create-attribute-ns: func(namespace-uri: string, qualified-name: string) -> result<attr, string>;
+
+        get-elements-by-tag-name: func(tagname: string) -> list<element>;
+        get-elements-by-tag-name-ns: func(namespace-uri: string, local-name: string) -> list<element>;
+        get-element-by-id: func(element-id: string) -> option<element>;
+
+        import-node: func(n: node, deep: bool) -> result<node, string>;
+        adopt-node: func(n: node) -> result<node, string>;
+
+        url: func() -> string;
+        document-uri: func() -> string;
+        character-set: func() -> string;
+        content-type: func() -> string;
+    }
+}
+
+/// World for host-provided DOM
+world xmldom-host {
+    export xmldom;
+}
+
+
