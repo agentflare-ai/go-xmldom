@@ -24,15 +24,15 @@ func UnmarshalDOM(data []byte) (Document, error) {
 func Marshal(v interface{}) ([]byte, error) {
 	// Check if v is a DOM Document
 	if doc, ok := v.(Document); ok {
-		return marshalDOM(doc, "", "")
+		return marshalDOM(doc, "", "", true)
 	}
 	// Check if v is a DOM Element
 	if elem, ok := v.(Element); ok {
-		return marshalElement(elem, "", "")
+		return marshalElement(elem, "", "", true)
 	}
 	// Check if v is any DOM Node
 	if node, ok := v.(Node); ok {
-		return marshalNode(node, "", "")
+		return marshalNode(node, "", "", true)
 	}
 	// For non-DOM objects, delegate to Go's standard xml.Marshal
 	return xml.Marshal(v)
@@ -40,8 +40,8 @@ func Marshal(v interface{}) ([]byte, error) {
 
 // MarshalIndent returns the XML encoding of v with optional prefix and indent.
 // If prefix or indent is provided, the output will include newlines and indentation.
-func MarshalIndent(v interface{}, prefix, indent string) ([]byte, error) {
-	return MarshalIndentWithOptions(v, prefix, indent, false)
+func MarshalIndent(v interface{}, prefix, indent string, preserveWhitespace bool) ([]byte, error) {
+	return MarshalIndentWithOptions(v, prefix, indent, preserveWhitespace)
 }
 
 // MarshalIndentWithOptions returns the XML encoding of v with optional prefix, indent, and whitespace preservation.
@@ -64,8 +64,8 @@ func MarshalIndentWithOptions(v interface{}, prefix, indent string, preserveWhit
 }
 
 // marshalDOM serializes a DOM Document to XML
-func marshalDOM(doc Document, prefix, indent string) ([]byte, error) {
-	return marshalDOMWithOptions(doc, prefix, indent, false)
+func marshalDOM(doc Document, prefix, indent string, preserveWhitespace bool) ([]byte, error) {
+	return marshalDOMWithOptions(doc, prefix, indent, preserveWhitespace)
 }
 
 // marshalDOMWithOptions serializes a DOM Document to XML with whitespace preservation option
@@ -94,8 +94,8 @@ func marshalDOMWithOptions(doc Document, prefix, indent string, preserveWhitespa
 }
 
 // marshalElement serializes a DOM Element to XML (without XML declaration)
-func marshalElement(elem Element, prefix, indent string) ([]byte, error) {
-	return marshalElementWithOptions(elem, prefix, indent, false)
+func marshalElement(elem Element, prefix, indent string, preserveWhitespace bool) ([]byte, error) {
+	return marshalElementWithOptions(elem, prefix, indent, preserveWhitespace)
 }
 
 // marshalElementWithOptions serializes a DOM Element to XML (without XML declaration) with whitespace preservation option
@@ -108,7 +108,7 @@ func marshalElementWithOptions(elem Element, prefix, indent string, preserveWhit
 }
 
 // marshalNode serializes any DOM Node to XML (without XML declaration)
-func marshalNode(node Node, prefix, indent string) ([]byte, error) {
+func marshalNode(node Node, prefix, indent string, preserveWhitespace bool) ([]byte, error) {
 	return marshalNodeWithOptions(node, prefix, indent, false)
 }
 
@@ -142,9 +142,21 @@ func serializeElement(buf *bytes.Buffer, elem Element, skipRoot bool, prefix, in
 					if attrNode, ok := attr.(Attr); ok {
 						buf.WriteString(" ")
 						buf.WriteString(string(attrNode.Name()))
-						buf.WriteString(`="`)
-						buf.WriteString(EscapeString(string(attrNode.Value())))
-						buf.WriteString(`"`)
+
+						// Use single quotes if the value contains double quotes (e.g., JSON)
+						// This makes JSON attributes much more readable
+						attrValue := string(attrNode.Value())
+						useSingleQuote := strings.Contains(attrValue, `"`)
+
+						if useSingleQuote {
+							buf.WriteString(`='`)
+							buf.WriteString(attrValue)
+							buf.WriteString(`'`)
+						} else {
+							buf.WriteString(`="`)
+							buf.WriteString(EscapeString(attrValue))
+							buf.WriteString(`"`)
+						}
 					}
 				}
 			}
@@ -215,9 +227,30 @@ func serializeElementWithOptions(buf *bytes.Buffer, elem Element, skipRoot bool,
 					if attrNode, ok := attr.(Attr); ok {
 						buf.WriteString(" ")
 						buf.WriteString(string(attrNode.Name()))
-						buf.WriteString(`="`)
-						buf.WriteString(EscapeString(string(attrNode.Value())))
-						buf.WriteString(`"`)
+
+						// Use single quotes if the value contains double quotes (e.g., JSON)
+						// This makes JSON attributes much more readable
+						attrValue := string(attrNode.Value())
+						useSingleQuote := strings.Contains(attrValue, `"`)
+
+						if useSingleQuote {
+							buf.WriteString(`='`)
+							// When using single quotes, escape any single quotes in the value
+							if !preserveWhitespace {
+								buf.WriteString(strings.ReplaceAll(EscapeString(attrValue), `"`, `"`))
+							} else {
+								buf.WriteString(attrValue)
+							}
+							buf.WriteString(`'`)
+						} else {
+							buf.WriteString(`="`)
+							if !preserveWhitespace {
+								buf.WriteString(EscapeString(attrValue))
+							} else {
+								buf.WriteString(attrValue)
+							}
+							buf.WriteString(`"`)
+						}
 					}
 				}
 			}
@@ -276,10 +309,15 @@ func serializeNode(buf *bytes.Buffer, node Node, prefix, indent string, depth in
 		}
 	case TEXT_NODE:
 		if text, ok := node.(Text); ok {
+			// Skip whitespace-only text nodes when indenting
+			textData := string(text.Data())
+			if indent != "" && strings.TrimSpace(textData) == "" {
+				return nil
+			}
 			if indent != "" {
 				buf.WriteString(strings.Repeat(indent, depth))
 			}
-			buf.WriteString(EscapeString(string(text.Data())))
+			buf.WriteString(EscapeString(textData))
 			if indent != "" {
 				buf.WriteString("\n")
 			}
@@ -338,15 +376,20 @@ func serializeNodeWithOptions(buf *bytes.Buffer, node Node, prefix, indent strin
 		}
 	case TEXT_NODE:
 		if text, ok := node.(Text); ok {
+			textData := string(text.Data())
+			// Skip whitespace-only text nodes when indenting
+			if indent != "" && strings.TrimSpace(textData) == "" {
+				return nil
+			}
 			if indent != "" {
 				buf.WriteString(strings.Repeat(indent, depth))
 			}
 			if preserveWhitespace {
 				// Write text content without escaping whitespace characters
-				buf.WriteString(string(text.Data()))
+				buf.WriteString(textData)
 			} else {
 				// Use standard escaping for XML compliance
-				buf.WriteString(EscapeString(string(text.Data())))
+				buf.WriteString(EscapeString(textData))
 			}
 			if indent != "" {
 				buf.WriteString("\n")
