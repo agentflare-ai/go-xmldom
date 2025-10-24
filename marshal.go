@@ -109,7 +109,7 @@ func marshalElementWithOptions(elem Element, prefix, indent string, preserveWhit
 
 // marshalNode serializes any DOM Node to XML (without XML declaration)
 func marshalNode(node Node, prefix, indent string, preserveWhitespace bool) ([]byte, error) {
-	return marshalNodeWithOptions(node, prefix, indent, false)
+	return marshalNodeWithOptions(node, prefix, indent, preserveWhitespace)
 }
 
 // marshalNodeWithOptions serializes any DOM Node to XML (without XML declaration) with whitespace preservation option
@@ -121,90 +121,90 @@ func marshalNodeWithOptions(node Node, prefix, indent string, preserveWhitespace
 	return buf.Bytes(), nil
 }
 
-// serializeElement serializes an Element and its children to XML
-func serializeElement(buf *bytes.Buffer, elem Element, skipRoot bool, prefix, indent string, depth int) error {
-	// Write indentation if indent is provided
-	if indent != "" && !skipRoot {
-		buf.WriteString(strings.Repeat(indent, depth))
-	}
+// // serializeElement serializes an Element and its children to XML
+// func serializeElement(buf *bytes.Buffer, elem Element, skipRoot bool, prefix, indent string, depth int) error {
+// 	// Write indentation if indent is provided
+// 	if indent != "" && !skipRoot {
+// 		buf.WriteString(strings.Repeat(indent, depth))
+// 	}
 
-	if !skipRoot {
-		// Write opening tag
-		buf.WriteString("<")
-		buf.WriteString(string(elem.TagName()))
+// 	if !skipRoot {
+// 		// Write opening tag
+// 		buf.WriteString("<")
+// 		buf.WriteString(string(elem.TagName()))
 
-		// Write attributes
-		attrs := elem.Attributes()
-		if attrs != nil {
-			for i := uint(0); i < attrs.Length(); i++ {
-				attr := attrs.Item(i)
-				if attr != nil && attr.NodeType() == ATTRIBUTE_NODE {
-					if attrNode, ok := attr.(Attr); ok {
-						buf.WriteString(" ")
-						buf.WriteString(string(attrNode.Name()))
+// 		// Write attributes
+// 		attrs := elem.Attributes()
+// 		if attrs != nil {
+// 			for i := uint(0); i < attrs.Length(); i++ {
+// 				attr := attrs.Item(i)
+// 				if attr != nil && attr.NodeType() == ATTRIBUTE_NODE {
+// 					if attrNode, ok := attr.(Attr); ok {
+// 						buf.WriteString(" ")
+// 						buf.WriteString(string(attrNode.Name()))
 
-						// Use single quotes if the value contains double quotes (e.g., JSON)
-						// This makes JSON attributes much more readable
-						attrValue := string(attrNode.Value())
-						useSingleQuote := strings.Contains(attrValue, `"`)
+// 						// Use single quotes if the value contains double quotes (e.g., JSON)
+// 						// This makes JSON attributes much more readable
+// 						attrValue := string(attrNode.Value())
+// 						useSingleQuote := strings.Contains(attrValue, `"`)
 
-						if useSingleQuote {
-							buf.WriteString(`='`)
-							buf.WriteString(attrValue)
-							buf.WriteString(`'`)
-						} else {
-							buf.WriteString(`="`)
-							buf.WriteString(EscapeString(attrValue))
-							buf.WriteString(`"`)
-						}
-					}
-				}
-			}
-		}
+// 						if useSingleQuote {
+// 							buf.WriteString(`='`)
+// 							buf.WriteString(attrValue)
+// 							buf.WriteString(`'`)
+// 						} else {
+// 							buf.WriteString(`="`)
+// 							buf.WriteString(EscapeString(attrValue))
+// 							buf.WriteString(`"`)
+// 						}
+// 					}
+// 				}
+// 			}
+// 		}
 
-		// Check if element has children
-		hasChildren := elem.HasChildNodes()
-		if !hasChildren {
-			// For SCXML conformance, always use explicit opening/closing tags
-			// instead of self-closing tags for empty elements
-			buf.WriteString("></")
-			buf.WriteString(string(elem.TagName()))
-			buf.WriteString(">")
-			if indent != "" {
-				buf.WriteString("\n")
-			}
-			return nil
-		}
+// 		// Check if element has children
+// 		hasChildren := elem.HasChildNodes()
+// 		if !hasChildren {
+// 			// For SCXML conformance, always use explicit opening/closing tags
+// 			// instead of self-closing tags for empty elements
+// 			buf.WriteString("></")
+// 			buf.WriteString(string(elem.TagName()))
+// 			buf.WriteString(">")
+// 			if indent != "" {
+// 				buf.WriteString("\n")
+// 			}
+// 			return nil
+// 		}
 
-		buf.WriteString(">")
-		if indent != "" && hasChildren {
-			buf.WriteString("\n")
-		}
-	}
+// 		buf.WriteString(">")
+// 		if indent != "" && hasChildren {
+// 			buf.WriteString("\n")
+// 		}
+// 	}
 
-	// Serialize children
-	for child := elem.FirstChild(); child != nil; child = child.NextSibling() {
-		if err := serializeNode(buf, child, prefix, indent, depth+1); err != nil {
-			return err
-		}
-	}
+// 	// Serialize children
+// 	for child := elem.FirstChild(); child != nil; child = child.NextSibling() {
+// 		if err := serializeNode(buf, child, prefix, indent, depth+1); err != nil {
+// 			return err
+// 		}
+// 	}
 
-	if !skipRoot {
-		// Write indentation for closing tag if indent is provided
-		if indent != "" {
-			buf.WriteString(strings.Repeat(indent, depth))
-		}
-		// Write closing tag
-		buf.WriteString("</")
-		buf.WriteString(string(elem.TagName()))
-		buf.WriteString(">")
-		if indent != "" {
-			buf.WriteString("\n")
-		}
-	}
+// 	if !skipRoot {
+// 		// Write indentation for closing tag if indent is provided
+// 		if indent != "" {
+// 			buf.WriteString(strings.Repeat(indent, depth))
+// 		}
+// 		// Write closing tag
+// 		buf.WriteString("</")
+// 		buf.WriteString(string(elem.TagName()))
+// 		buf.WriteString(">")
+// 		if indent != "" {
+// 			buf.WriteString("\n")
+// 		}
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
 // serializeElementWithOptions serializes an Element and its children to XML with whitespace preservation option
 func serializeElementWithOptions(buf *bytes.Buffer, elem Element, skipRoot bool, prefix, indent string, depth int, preserveWhitespace bool) error {
@@ -300,72 +300,72 @@ func serializeElementWithOptions(buf *bytes.Buffer, elem Element, skipRoot bool,
 	return nil
 }
 
-// serializeNode serializes any DOM node to XML
-func serializeNode(buf *bytes.Buffer, node Node, prefix, indent string, depth int) error {
-	switch node.NodeType() {
-	case ELEMENT_NODE:
-		if elem, ok := node.(Element); ok {
-			return serializeElement(buf, elem, false, prefix, indent, depth)
-		}
-	case TEXT_NODE:
-		if text, ok := node.(Text); ok {
-			// Skip whitespace-only text nodes when indenting
-			textData := string(text.Data())
-			if indent != "" && strings.TrimSpace(textData) == "" {
-				return nil
-			}
-			if indent != "" {
-				buf.WriteString(strings.Repeat(indent, depth))
-			}
-			buf.WriteString(EscapeString(textData))
-			if indent != "" {
-				buf.WriteString("\n")
-			}
-		}
-	case COMMENT_NODE:
-		if comment, ok := node.(Comment); ok {
-			if indent != "" {
-				buf.WriteString(strings.Repeat(indent, depth))
-			}
-			buf.WriteString("<!--")
-			buf.WriteString(string(comment.Data()))
-			buf.WriteString("-->")
-			if indent != "" {
-				buf.WriteString("\n")
-			}
-		}
-	case CDATA_SECTION_NODE:
-		if cdata, ok := node.(CDATASection); ok {
-			if indent != "" {
-				buf.WriteString(strings.Repeat(indent, depth))
-			}
-			buf.WriteString("<![CDATA[")
-			buf.WriteString(string(cdata.Data()))
-			buf.WriteString("]]>")
-			if indent != "" {
-				buf.WriteString("\n")
-			}
-		}
-	case PROCESSING_INSTRUCTION_NODE:
-		if pi, ok := node.(ProcessingInstruction); ok {
-			if indent != "" {
-				buf.WriteString(strings.Repeat(indent, depth))
-			}
-			buf.WriteString("<?")
-			buf.WriteString(string(pi.Target()))
-			if data := string(pi.Data()); data != "" {
-				buf.WriteString(" ")
-				buf.WriteString(data)
-			}
-			buf.WriteString("?>")
-			if indent != "" {
-				buf.WriteString("\n")
-			}
-		}
-		// Skip other node types for now
-	}
-	return nil
-}
+// // serializeNode serializes any DOM node to XML
+// func serializeNode(buf *bytes.Buffer, node Node, prefix, indent string, depth int, preserveWhitespace bool) error {
+// 	switch node.NodeType() {
+// 	case ELEMENT_NODE:
+// 		if elem, ok := node.(Element); ok {
+// 			return serializeElementWithOptions(buf, elem, false, prefix, indent, depth, preserveWhitespace)
+// 		}
+// 	case TEXT_NODE:
+// 		if text, ok := node.(Text); ok {
+// 			// Skip whitespace-only text nodes when indenting
+// 			textData := string(text.Data())
+// 			if indent != "" && strings.TrimSpace(textData) == "" {
+// 				return nil
+// 			}
+// 			if indent != "" {
+// 				buf.WriteString(strings.Repeat(indent, depth))
+// 			}
+// 			buf.WriteString(EscapeString(textData))
+// 			if indent != "" {
+// 				buf.WriteString("\n")
+// 			}
+// 		}
+// 	case COMMENT_NODE:
+// 		if comment, ok := node.(Comment); ok {
+// 			if indent != "" {
+// 				buf.WriteString(strings.Repeat(indent, depth))
+// 			}
+// 			buf.WriteString("<!--")
+// 			buf.WriteString(string(comment.Data()))
+// 			buf.WriteString("-->")
+// 			if indent != "" {
+// 				buf.WriteString("\n")
+// 			}
+// 		}
+// 	case CDATA_SECTION_NODE:
+// 		if cdata, ok := node.(CDATASection); ok {
+// 			if indent != "" {
+// 				buf.WriteString(strings.Repeat(indent, depth))
+// 			}
+// 			buf.WriteString("<![CDATA[")
+// 			buf.WriteString(string(cdata.Data()))
+// 			buf.WriteString("]]>")
+// 			if indent != "" {
+// 				buf.WriteString("\n")
+// 			}
+// 		}
+// 	case PROCESSING_INSTRUCTION_NODE:
+// 		if pi, ok := node.(ProcessingInstruction); ok {
+// 			if indent != "" {
+// 				buf.WriteString(strings.Repeat(indent, depth))
+// 			}
+// 			buf.WriteString("<?")
+// 			buf.WriteString(string(pi.Target()))
+// 			if data := string(pi.Data()); data != "" {
+// 				buf.WriteString(" ")
+// 				buf.WriteString(data)
+// 			}
+// 			buf.WriteString("?>")
+// 			if indent != "" {
+// 				buf.WriteString("\n")
+// 			}
+// 		}
+// 		// Skip other node types for now
+// 	}
+// 	return nil
+// }
 
 // serializeNodeWithOptions serializes any DOM node to XML with whitespace preservation option
 func serializeNodeWithOptions(buf *bytes.Buffer, node Node, prefix, indent string, depth int, preserveWhitespace bool) error {
